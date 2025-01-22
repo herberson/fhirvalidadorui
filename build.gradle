@@ -1,0 +1,121 @@
+plugins {
+	id 'java'
+	id 'com.palantir.git-version' version '3.0.0'
+	id 'eclipse'
+	id "org.sonarqube" version "6.0.0.5145"
+	id 'com.github.johnrengelman.shadow' version '8.1.1'
+}
+
+java {
+	sourceCompatibility = JavaVersion.VERSION_21
+}
+
+repositories {
+    mavenCentral()
+}
+
+javadoc {
+    options.memberLevel = JavadocMemberLevel.PRIVATE
+    options.addStringOption('Xdoclint:none', '-quiet')
+}
+
+try {
+    version = gitVersion()
+} catch (Exception e) {
+    version = '0.0.1-SNAPSHOT'
+}
+
+ext {
+	set('hapiFhirVersion', "7.6.1")
+    try {
+        def details = versionDetails()
+        set('gitHashFull', details.gitHashFull)
+    } catch (Exception e) {
+        set('gitHashFull', "SNAPSHOT")
+    }
+}
+
+
+dependencies {    
+    implementation group: 'commons-io', name: 'commons-io', version: '2.17'
+    implementation group: 'commons-beanutils', name: 'commons-beanutils', version: '1.9.3'
+    implementation group: 'org.apache.commons', name: 'commons-text', version: '1.2'
+    implementation group: 'commons-codec', name: 'commons-codec', version: '1.14'
+    
+    implementation group: 'com.fasterxml.jackson.dataformat', name: 'jackson-dataformat-xml', version: '2.9.3'
+    
+    implementation group: 'log4j', name: 'log4j', version: '1.2.17'
+    
+    implementation "ca.uhn.hapi.fhir:hapi-fhir-base:${hapiFhirVersion}"
+    implementation "ca.uhn.hapi.fhir:hapi-fhir-server:${hapiFhirVersion}"
+    implementation "ca.uhn.hapi.fhir:hapi-fhir-structures-r4:${hapiFhirVersion}"
+    implementation "ca.uhn.hapi.fhir:hapi-fhir-structures-r4b:${hapiFhirVersion}"
+    implementation "ca.uhn.hapi.fhir:hapi-fhir-structures-r5:${hapiFhirVersion}"
+    implementation "ca.uhn.hapi.fhir:hapi-fhir-validation:${hapiFhirVersion}"
+    implementation "ca.uhn.hapi.fhir:hapi-fhir-validation-resources-r4:${hapiFhirVersion}"
+    implementation "ca.uhn.hapi.fhir:hapi-fhir-validation-resources-r4b:${hapiFhirVersion}"
+    implementation "ca.uhn.hapi.fhir:hapi-fhir-validation-resources-r5:${hapiFhirVersion}"
+    implementation "ca.uhn.hapi.fhir:hapi-fhir-caching-caffeine:${hapiFhirVersion}"
+    
+    implementation 'com.fifesoft:rsyntaxtextarea:3.1.1'
+}
+
+
+eclipseJdt.doLast {
+    //definindo o encoding dos fontes para o projeto
+    File f = file('.settings/org.eclipse.core.resources.prefs')
+    f.write('eclipse.preferences.version=1\n')
+    f.append('encoding/<project>=UTF-8')
+    
+    //definindo o "unix end of line"
+    f = file('.settings/org.eclipse.core.runtime.prefs')
+    f.write('eclipse.preferences.version=1\n')
+    f.append('line.separator=\\n')    
+}
+
+task copyToLib(type: Copy) {   
+    into "${buildDir}/libs"
+    from sourceSets.main.runtimeClasspath
+    from "splash.gif"
+    exclude "**/*.class", "**/*.properties"
+    includeEmptyDirs false
+}
+
+jar {
+	manifest {
+        attributes 'Implementation-Title': 'Tarea - Validador FHIR',
+        	'Implementation-Version': rootProject.version,
+        	'Main-Class': 'ui.FhirValidacaoWindow',
+        	'SplashScreen-Image': 'splash.gif',
+			'Built-On': String.format('%1$tY-%1$tm-%1$tdT%1$tT%1$tz', new Date()),
+			'Git-Hash-Commit': "${gitHashFull}"
+    }
+}
+
+task copyExecFiles(type: Copy) {
+	mustRunAfter(compileJava)
+    into "${buildDir}/libs"
+    from project.rootDir
+    include "executar.*"
+    exclude "${buildDir}/**"
+    includeEmptyDirs false
+}
+
+//compileJava.mustRunAfter(copyExecFiles)
+
+task doZip(type: Zip) {
+	mustRunAfter(copyExecFiles, shadowJar)
+	from "${buildDir}/libs"
+	include "*"
+}
+
+task release {
+	dependsOn([clean, shadowJar, copyExecFiles, doZip])
+}
+
+task run(type: JavaExec) {
+    group = "Execution"
+    description = "Run the main class with JavaExecTask"
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = "ui.FhirValidacaoWindow"
+}
