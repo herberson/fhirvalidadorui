@@ -35,17 +35,14 @@ jobs:
       with:
         gradle-version: '8.12'
       
-    # - name: Make gradlew executable
-    #   run: chmod +x ./gradlew
-      
     - name: Build with Gradle Wrapper
       run: bash ./gradlew release
 
-    # - name: Archive binaries
-    #   uses: actions/upload-artifact@v4
-    #   with:
-    #     path: ./build/distributions/*.zip
-    #     name: TareaFHIRValidadorUI
+    - name: Archive binaries
+      uses: actions/upload-artifact@v4
+      with:
+        path: ./build/distributions/*.zip
+        name: TareaFHIRValidadorUI
 
   dependency-submission:
 
